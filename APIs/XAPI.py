@@ -1,24 +1,27 @@
 import requests
+import datetime
+from DB.dbConnection import X_collection 
+import os
+from dotenv import load_dotenv
 
-# Replace with your own Twitter API Bearer Token
-BEARER_TOKEN = "AAAAAAAAAAAAAAAAAAAAAEb8ygEAAAAA3gOt9vPddaM0Hzp738AXNQN0D94%3DLzJESTfjiUffLQeCmCnY3TR3sQ9BtB6XQkorEOy7VYnHCzWOoa"
+load_dotenv()
+
+BEARER_TOKEN = os.getenv("X_BEARER_TOKEN")
 
 # Define the search query
-QUERY = "stock market"  # Change to any keyword you're tracking
+QUERY = "stock market"
 
 # Define the API endpoint
 URL = "https://api.twitter.com/2/tweets/search/recent"
 
-# Define request headers
 HEADERS = {
     "Authorization": f"Bearer {BEARER_TOKEN}"
 }
 
-# Define request parameters
 PARAMS = {
     "query": QUERY,
-    "max_results": 1,  # Number of tweets to retrieve (Max: 100)
-    "tweet.fields": "created_at,author_id"
+    "max_results": 10,  # Fetch latest 10 tweets (min is 10)
+    "tweet.fields": "created_at,author_id,text"
 }
 
 def fetch_tweets():
@@ -26,10 +29,23 @@ def fetch_tweets():
     
     if response.status_code == 200:
         data = response.json()
+        tweets = []
+
         for tweet in data.get("data", []):
-            print(f"{tweet['created_at']} - {tweet['id']}: {tweet['text']}\n")
+            tweet_data = {
+                "tweet_id": tweet["id"],
+                "text": tweet["text"],
+                "author_id": tweet["author_id"],
+                "created_at": tweet["created_at"],
+                "timestamp": datetime.datetime.utcnow()
+            }
+            tweets.append(tweet_data)
+
+        if tweets:
+            X_collection.insert_many(tweets)  # Insert into MongoDB
+            print(f"Inserted {len(tweets)} tweets into MongoDB!")
+
     else:
         print(f"Error: {response.status_code}, {response.text}")
 
-# Run the function
 fetch_tweets()
