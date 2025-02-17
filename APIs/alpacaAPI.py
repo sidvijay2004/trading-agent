@@ -1,20 +1,16 @@
-import asyncio
-import logging
+import requests
 import os
-import json
-import websockets
+import logging
 from dotenv import load_dotenv
 from pymongo import MongoClient
+from datetime import datetime
 
-# Load environment variables
 load_dotenv()
 
-# Alpaca API credentials
+# Alpaca API credentials (Paper Trading)
 API_KEY = os.getenv("ALPACA_API_KEY")
 API_SECRET = os.getenv("ALPACA_API_SECRET")
-
-# ✅ Correct WebSocket URL for News Stream
-NEWS_WEBSOCKET_URL = "wss://stream.data.alpaca.markets/v1beta1/news"
+BASE_URL = os.getenv("ALPACA_TRADE_ENDPOINT")
 
 # MongoDB Connection
 MONGO_URI = os.getenv("MONGO_URI")
@@ -22,77 +18,59 @@ if not MONGO_URI:
     raise ValueError("MONGO_URI is not set in the .env file")
 
 client = MongoClient(MONGO_URI)
-db = client["sentimentData"]
-news_collection = db["news_articles"]
+db = client["tradingData"]
+trades_collection = db["executed_trades"]
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+def place_trade(symbol, qty, side, order_type="market", time_in_force="gtc"):
+    """
+    Places a trade on Alpaca Paper Trading account and logs it in MongoDB.
+    """
 
-async def connect():
-    """Connects to the Alpaca WebSocket and listens for news data."""
-    async with websockets.connect(NEWS_WEBSOCKET_URL) as ws:
-        logger.info("✅ Connected to Alpaca News WebSocket.")
+    url = f"{BASE_URL}/orders"
+    headers = {
+        "APCA-API-KEY-ID": API_KEY,
+        "APCA-API-SECRET-KEY": API_SECRET,
+        "Content-Type": "application/json"
+    }
+    order_data = {
+        "symbol": symbol,
+        "qty": qty,
+        "side": side,
+        "type": order_type,
+        "time_in_force": time_in_force
+    }
 
-        # ✅ Authenticate
-        auth_msg = json.dumps({
-            "action": "auth",
-            "key": API_KEY,
-            "secret": API_SECRET
-        })
-        await ws.send(auth_msg)
-        response = await ws.recv()
-        logger.info(f"✅ Authentication Response: {response}")
-
-        # ✅ Subscribe to the news stream
-        subscribe_msg = json.dumps({
-            "action": "subscribe",
-            "news": ["*"]
-        })
-        await ws.send(subscribe_msg)
-        response = await ws.recv()
-        logger.info(f"✅ Subscription Response: {response}")
-
-        # ✅ Continuously listen for incoming messages
-        while True:
-            message = await ws.recv()
-            process_news(message)
-
-
-def process_news(message):
-    """Handles incoming news data."""
     try:
-        news = json.loads(message)
-        logger.info(f"🔔 News Received: {news}")
+        response = requests.post(url, json=order_data, headers=headers)
+        response.raise_for_status()
+        trade_info = response.json()
+        
+        logger.info(f"✅ Trade Successful: {trade_info}")
 
-        # Insert into MongoDB if not duplicate
-        for article in news:
-            if article.get("T") == "n":  # Ensures message is a news article
-                news_data = {
-                    "id": article["id"],
-                    "headline": article["headline"],
-                    "summary": article.get("summary", ""),
-                    "author": article.get("author", ""),
-                    "created_at": article.get("created_at", ""),
-                    "updated_at": article.get("updated_at", ""),
-                    "url": article.get("url", ""),
-                    "symbols": article.get("symbols", []),
-                    "source": article.get("source", ""),
-                    "content": article.get("content", "")
-                }
+        # Store trade info in MongoDB
+        trade_record = {
+            "symbol": trade_info["symbol"],
+            "qty": trade_info["qty"],
+            "side": trade_info["side"],
+            "order_type": trade_info["type"],
+            "time_in_force": trade_info["time_in_force"],
+            "filled_avg_price": trade_info.get("filled_avg_price", None),
+            "status": trade_info["status"],
+            "submitted_at": trade_info["submitted_at"],
+            "created_at": datetime.utcnow()
+        }
+        trades_collection.insert_one(trade_record)
+        logger.info(f"✅ Trade recorded in MongoDB: {trade_record}")
 
-                # Insert only if not already in database
-                if not news_collection.find_one({"id": article["id"]}):
-                    news_collection.insert_one(news_data)
-                    logger.info(f"✅ Inserted news: {news_data['headline']}")
-                else:
-                    logger.info(f"⚠️ Duplicate news skipped: {news_data['headline']}")
+        return trade_info
+    except requests.exceptions.RequestException as e:
+        logger.error(f"❌ Trade Failed: {e}")
+        return None
 
-    except Exception as e:
-        logger.error(f"⚠️ Error processing news: {e}")
-
-
-# Run the WebSocket connection
 if __name__ == "__main__":
-    asyncio.run(connect())
+    # Example: Buy 1 share of AAPL and record it
+    place_trade(symbol="AAPL", qty=1, side="buy")
