@@ -23,7 +23,7 @@ def fetch_financial_news():
                 "published": article["publishedAt"],
                 "url": article["url"],
                 "timestamp": datetime.datetime.utcnow()
-            }
+            }   
             news_articles.append(news_data)
 
         if news_articles:
