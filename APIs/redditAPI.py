@@ -28,18 +28,18 @@ class RedditAPI(BaseAPI):
                     continue  
 
                 text = f"{post.title} {post.selftext}"
-                stock = self.get_tracked_stock(text)  # ✅ Identify stock
+                stock = self.get_tracked_stock(text)
                 if not stock:
                     continue  # Skip if no tracked stock is mentioned
 
                 post.comments.replace_more(limit=0)
                 top_comments = [comment.body for comment in post.comments.list()[:5]]
 
-                sentiment = self.analyze_sentiment(text)  # ✅ Use BaseAPI method
+                sentiment = self.analyze_sentiment(text)
                 expected_impact = self.calculate_expected_impact(text, sentiment)
 
                 reddit_data = {
-                    "stock": stock,  # ✅ Store stock symbol
+                    "stock": stock,
                     "title": post.title,
                     "author": str(post.author),
                     "upvotes": post.score,

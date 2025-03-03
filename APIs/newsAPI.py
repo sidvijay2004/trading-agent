@@ -3,7 +3,7 @@ import datetime
 import os
 from dotenv import load_dotenv
 from DB.dbConnection import news_collection
-from baseAPI import BaseAPI  # ✅ Inherit from BaseAPI
+from baseAPI import BaseAPI
 
 # Load environment variables
 load_dotenv()
@@ -33,15 +33,15 @@ class NewsAPI(BaseAPI):
                 source = article["source"]["name"]
 
                 full_text = f"{title} {description} {content}"
-                stock = self.get_tracked_stock(full_text)  # ✅ Identify stock
+                stock = self.get_tracked_stock(full_text)
                 if not stock:
-                    continue  # Skip if no tracked stock is mentioned
+                    continue
 
-                sentiment = self.analyze_sentiment(full_text)  # ✅ Use BaseAPI method
+                sentiment = self.analyze_sentiment(full_text)
                 expected_impact = self.calculate_expected_impact(full_text, sentiment, source)
 
                 news_data = {
-                    "stock": stock,  # ✅ Store stock symbol
+                    "stock": stock,
                     "title": title,
                     "description": description,
                     "content": content,
