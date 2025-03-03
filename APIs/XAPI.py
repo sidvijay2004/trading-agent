@@ -3,7 +3,7 @@ import datetime
 import os
 from dotenv import load_dotenv
 from DB.dbConnection import X_collection
-from baseAPI import BaseAPI  # ✅ Import BaseAPI
+from baseAPI import BaseAPI  # ✅ Inherit from BaseAPI
 
 # Load environment variables
 load_dotenv()
@@ -33,17 +33,22 @@ class XAPI(BaseAPI):  # ✅ Inherit from BaseAPI
 
             for tweet in data.get("data", []):
                 metrics = tweet["public_metrics"]
-
                 if metrics["like_count"] < 5 and metrics["retweet_count"] < 3:
                     continue
 
+                text = tweet["text"]
+                stock = self.get_tracked_stock(text)  # ✅ Identify stock
+                if not stock:
+                    continue  # Skip if no tracked stock is mentioned
+
                 author_info = users.get(tweet["author_id"], {})
-                sentiment = self.analyze_sentiment(tweet["text"])  # ✅ Use BaseAPI method
-                expected_impact = self.calculate_expected_impact(tweet["text"], sentiment)  # ✅ Use BaseAPI method
+                sentiment = self.analyze_sentiment(text)  # ✅ Use BaseAPI method
+                expected_impact = self.calculate_expected_impact(text, sentiment)
 
                 tweet_data = {
+                    "stock": stock,  # ✅ Store stock symbol
                     "tweet_id": tweet["id"],
-                    "text": tweet["text"],
+                    "text": text,
                     "author_id": tweet["author_id"],
                     "author_username": author_info.get("username", "Unknown"),
                     "verified": author_info.get("verified", False),
@@ -59,7 +64,7 @@ class XAPI(BaseAPI):  # ✅ Inherit from BaseAPI
 
             if tweets:
                 X_collection.insert_many(tweets)
-                print(f"✅ Inserted {len(tweets)} relevant tweets into MongoDB!")
+                print(f"✅ Inserted {len(tweets)} filtered tweets into MongoDB!")
 
         else:
             print(f"❌ Error: {response.status_code}, {response.text}")

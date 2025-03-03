@@ -100,7 +100,8 @@ def get_portfolio_positions():
 
 def get_stock_data(symbol):
     """
-    Retrieves the latest stock market data for a given symbol.
+    Retrieves the latest stock market data for a given symbol from Alpaca.
+    Returns additional useful trading metrics like volume and bid-ask spread.
     """
     url = f"{BASE_MARKET_URL}/stocks/{symbol}/quotes/latest"
     headers = {
@@ -112,16 +113,24 @@ def get_stock_data(symbol):
         response = requests.get(url, headers=headers)
         response.raise_for_status()
         data = response.json()
-        
-        # Extract stock price data
+
+        # Extract stock price data and alternative trading metrics
+        bid_price = data["quote"]["bp"]
+        ask_price = data["quote"]["ap"]
+        spread = round(ask_price - bid_price, 2)  # ✅ New metric: bid-ask spread
+        last_trade_price = (bid_price + ask_price) / 2
+        volume = data["quote"].get("bv", 0)  # ✅ New metric: trading volume
+
         stock_info = {
             "symbol": symbol,
-            "bid_price": data["quote"]["bp"],
-            "ask_price": data["quote"]["ap"],
-            "last_trade_price": (data["quote"]["bp"] + data["quote"]["ap"]) / 2,
+            "bid_price": bid_price,
+            "ask_price": ask_price,
+            "last_trade_price": last_trade_price,
+            "spread": spread,
+            "volume": volume,
             "timestamp": datetime.utcnow()
         }
-        
+
         # Store in MongoDB
         stock_data_collection.insert_one(stock_info)
         logger.info(f"✅ Stock Data Stored: {stock_info}")
