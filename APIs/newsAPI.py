@@ -3,9 +3,9 @@ import datetime
 import os
 from dotenv import load_dotenv
 from DB.dbConnection import news_collection
-from baseAPI import BaseAPI  # ✅ Inherit from BaseAPI
+from baseAPI import BaseAPI
 
-
+# Load environment variables
 load_dotenv()
 API_KEY = os.getenv("NEWS_API_KEY")
 
@@ -32,10 +32,16 @@ class NewsAPI(BaseAPI):
                 content = article.get("content", "")
                 source = article["source"]["name"]
 
-                sentiment = self.analyze_sentiment(f"{title} {description} {content}")  # ✅ Use BaseAPI method
-                expected_impact = self.calculate_expected_impact(f"{title} {description} {content}", sentiment, source)
+                full_text = f"{title} {description} {content}"
+                stock = self.get_tracked_stock(full_text)
+                if not stock:
+                    continue
+
+                sentiment = self.analyze_sentiment(full_text)
+                expected_impact = self.calculate_expected_impact(full_text, sentiment, source)
 
                 news_data = {
+                    "stock": stock,
                     "title": title,
                     "description": description,
                     "content": content,
@@ -50,7 +56,7 @@ class NewsAPI(BaseAPI):
 
             if news_articles:
                 news_collection.insert_many(news_articles)
-                print(f"✅ Inserted {len(news_articles)} news articles into MongoDB!")
+                print(f"✅ Inserted {len(news_articles)} filtered news articles into MongoDB!")
 
         else:
             print(f"❌ Error: {response.status_code}, {response.text}")

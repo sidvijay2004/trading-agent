@@ -23,20 +23,23 @@ class RedditAPI(BaseAPI):
         for subreddit_name in SUBREDDITS:
             subreddit = reddit.subreddit(subreddit_name)
 
-            for post in itertools.chain(
-                subreddit.hot(limit=3), 
-                subreddit.rising(limit=3)
-            ):
+            for post in itertools.chain(subreddit.hot(limit=3), subreddit.rising(limit=3)):
                 if post.score < 50:
                     continue  
+
+                text = f"{post.title} {post.selftext}"
+                stock = self.get_tracked_stock(text)
+                if not stock:
+                    continue  # Skip if no tracked stock is mentioned
 
                 post.comments.replace_more(limit=0)
                 top_comments = [comment.body for comment in post.comments.list()[:5]]
 
-                sentiment = self.analyze_sentiment(f"{post.title} {post.selftext}")  # ✅ Use BaseAPI method
-                expected_impact = self.calculate_expected_impact(f"{post.title} {post.selftext}", sentiment)
+                sentiment = self.analyze_sentiment(text)
+                expected_impact = self.calculate_expected_impact(text, sentiment)
 
                 reddit_data = {
+                    "stock": stock,
                     "title": post.title,
                     "author": str(post.author),
                     "upvotes": post.score,
@@ -53,7 +56,7 @@ class RedditAPI(BaseAPI):
 
         if posts:
             reddit_collection.insert_many(posts)
-            print(f"✅ Inserted {len(posts)} relevant Reddit posts into MongoDB!")
+            print(f"✅ Inserted {len(posts)} filtered Reddit posts into MongoDB!")
 
 if __name__ == "__main__":
     reddit_api = RedditAPI()

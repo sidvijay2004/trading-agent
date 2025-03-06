@@ -100,7 +100,8 @@ def get_portfolio_positions():
 
 def get_stock_data(symbol):
     """
-    Retrieves the latest stock market data for a given symbol.
+    Retrieves the latest stock market data for a given symbol from Alpaca.
+    Returns additional useful trading metrics like volume and bid-ask spread.
     """
     url = f"{BASE_MARKET_URL}/stocks/{symbol}/quotes/latest"
     headers = {
@@ -112,16 +113,24 @@ def get_stock_data(symbol):
         response = requests.get(url, headers=headers)
         response.raise_for_status()
         data = response.json()
-        
-        # Extract stock price data
+
+        # Extract stock price data and alternative trading metrics
+        bid_price = data["quote"]["bp"]
+        ask_price = data["quote"]["ap"]
+        spread = round(ask_price - bid_price, 2)  # ✅ New metric: bid-ask spread
+        last_trade_price = (bid_price + ask_price) / 2
+        volume = data["quote"].get("bv", 0)  # ✅ New metric: trading volume
+
         stock_info = {
             "symbol": symbol,
-            "bid_price": data["quote"]["bp"],
-            "ask_price": data["quote"]["ap"],
-            "last_trade_price": (data["quote"]["bp"] + data["quote"]["ap"]) / 2,
+            "bid_price": bid_price,
+            "ask_price": ask_price,
+            "last_trade_price": last_trade_price,
+            "spread": spread,
+            "volume": volume,
             "timestamp": datetime.utcnow()
         }
-        
+
         # Store in MongoDB
         stock_data_collection.insert_one(stock_info)
         logger.info(f"✅ Stock Data Stored: {stock_info}")
@@ -176,6 +185,29 @@ def place_trade(symbol, qty, side, order_type="market", time_in_force="gtc"):
         logger.error(f"❌ Trade Failed: {e}")
         return None
 
+def check_stock_ownership(symbol):
+    """
+    Checks if the user owns shares of a stock in their Alpaca portfolio.
+    """
+    url = f"{BASE_TRADE_URL}/positions/{symbol}"
+    headers = {
+        "APCA-API-KEY-ID": API_KEY,
+        "APCA-API-SECRET-KEY": API_SECRET
+    }
+
+    try:
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            position = response.json()
+            return int(position["qty"])
+        elif response.status_code == 404:
+            return 0
+        else:
+            logger.warning(f"⚠️ Could not verify ownership for {symbol}: {response.text}")
+            return None
+    except requests.exceptions.RequestException as e:
+        logger.error(f"❌ Error checking stock ownership: {e}")
+        return None
 
 
 
@@ -189,15 +221,12 @@ if __name__ == "__main__":
         print(f"📊 Buying Power: ${account_info['buying_power']}")
         print(f"📈 Portfolio Value: ${account_info['equity']}\n")
 
-    # ✅ Get open positions in portfolio
     portfolio_positions = get_portfolio_positions()
     if portfolio_positions:
         print("\n📊 Current Portfolio Holdings:")
         for position in portfolio_positions:
             print(f"🔹 {position['symbol']}: {position['qty']} shares (${position['market_value']})")
 
-    # ✅ Get stock data for AAPL
     stock_info = get_stock_data("AAPL")
     
-    # ✅ Buy 1 share of AAPL
     place_trade(symbol="AAPL", qty=1, side="buy")
