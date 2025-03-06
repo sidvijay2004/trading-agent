@@ -1,8 +1,12 @@
 from APIs.newsAPI import NewsAPI
 from APIs.redditAPI import RedditAPI
 from APIs.XAPI import XAPI
+from utils.tradingModel import execute_trades  # Import trading function
 
-def run_all():
+def run_sentiment_analysis():
+    """
+    Fetches financial news, Reddit posts, and tweets and stores them in MongoDB.
+    """
     news_api = NewsAPI()
     reddit_api = RedditAPI()
     x_api = XAPI()
@@ -12,4 +16,8 @@ def run_all():
     x_api.fetch_tweets()
 
 if __name__ == "__main__":
-    run_all()
+    print("🚀 Running sentiment analysis...")
+    run_sentiment_analysis()
+
+    print("📈 Running trading model based on sentiment data...")
+    execute_trades()
