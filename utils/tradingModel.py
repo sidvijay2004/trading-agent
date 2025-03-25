@@ -1,5 +1,5 @@
 import logging
-from APIs.alpacaAPI import get_stock_data, place_trade, check_stock_ownership
+from APIs.alpacaAPI import get_account_info, get_stock_data, place_trade, check_stock_ownership
 from pymongo import MongoClient
 import os
 from dotenv import load_dotenv
@@ -103,6 +103,19 @@ def execute_trades():
         logger.info(f"📊 Trade Decision Stored: {trade_decision_entry}")
 
         if decision == "buy":
+
+            account_info = get_account_info()
+            if not account_info:
+                logger.warning("⚠️ Skipping trade — couldn't fetch account info.")
+                continue
+
+            available_cash = float(account_info["cash"])
+            price = get_stock_data(symbol)["last_trade_price"]
+
+            if available_cash < price:
+                logger.warning(f"💸 Not enough cash to buy 1 share of {symbol}. Needed: ${price:.2f}, Available: ${available_cash:.2f}")
+                continue
+            
             logger.info(f"📈 Executing BUY order for {symbol}")
             trade_info = place_trade(symbol, 1, "buy")
 
