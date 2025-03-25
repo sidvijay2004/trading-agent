@@ -45,24 +45,36 @@ def get_latest_sentiment_stocks():
 
 def evaluate_trade(symbol, sentiment_score, expected_impact):
     """
-    Decide whether to buy/sell/hold based on stock price, sentiment, and new Alpaca metrics.
+    Aggressive trade evaluation:
+    - Favor action (buy/sell) over holding
+    - Use sentiment, expected impact, and minimal market filters
     """
+    if sentiment_score is None or expected_impact is None:
+        return "hold"
+
     stock_data = get_stock_data(symbol)
     if not stock_data:
         logger.warning(f"❌ No stock data available for {symbol}")
         return "hold"
 
-    last_price = stock_data["last_trade_price"]
     spread = stock_data["spread"]
     volume = stock_data["volume"]
+    owned_shares = check_stock_ownership(symbol)
+    owns_stock = owned_shares is not None and owned_shares > 0
 
-    # ✅ Decision logic using alternative metrics
-    if sentiment_score > 0.7 and spread < 0.5 and volume > 100000 and expected_impact > 2:
+    # if spread > 5 or volume < 10000:
+    #     return "hold"
+
+    if sentiment_score > 0.6 and expected_impact > 1:
         return "buy"
-    elif sentiment_score < 0.3 and spread > 1 and volume > 200000 and expected_impact > 2:
+    elif sentiment_score < 0.4 and expected_impact > 1 and owns_stock:
+        return "sell"
+    elif owns_stock:
         return "sell"
     else:
-        return "hold"
+        return "buy"
+
+
 
 def execute_trades():
     """

@@ -1,6 +1,6 @@
 import praw
 from DB.dbConnection import reddit_collection
-import datetime
+from datetime import datetime
 import os
 import itertools
 from dotenv import load_dotenv
@@ -20,17 +20,25 @@ SUBREDDITS = ["stocks", "wallstreetbets", "investing", "securityanalysis"]
 class RedditAPI(BaseAPI):
     def fetch_reddit_posts(self):
         posts = []
+        window_start = self.get_market_window_start().timestamp()
+
         for subreddit_name in SUBREDDITS:
             subreddit = reddit.subreddit(subreddit_name)
 
-            for post in itertools.chain(subreddit.hot(limit=3), subreddit.rising(limit=3)):
+            for post in itertools.chain(subreddit.hot(limit=50), subreddit.rising(limit=50)):
                 if post.score < 50:
-                    continue  
+                    continue
+
+                if post.created_utc < window_start:
+                    continue
+
+                if reddit_collection.find_one({"post_id": post.id}):
+                    continue
 
                 text = f"{post.title} {post.selftext}"
                 stock = self.get_tracked_stock(text)
                 if not stock:
-                    continue  # Skip if no tracked stock is mentioned
+                    continue
 
                 post.comments.replace_more(limit=0)
                 top_comments = [comment.body for comment in post.comments.list()[:5]]
@@ -39,6 +47,7 @@ class RedditAPI(BaseAPI):
                 expected_impact = self.calculate_expected_impact(text, sentiment)
 
                 reddit_data = {
+                    "post_id": post.id,
                     "stock": stock,
                     "title": post.title,
                     "author": str(post.author),
@@ -48,7 +57,7 @@ class RedditAPI(BaseAPI):
                     "selftext": post.selftext[:500] if post.is_self else None,
                     "flair": post.link_flair_text if post.link_flair_text else None,
                     "top_comments": top_comments,
-                    "timestamp": datetime.datetime.utcnow(),
+                    "timestamp": datetime.utcnow(),
                     "sentiment": sentiment,
                     "expected_impact": expected_impact
                 }

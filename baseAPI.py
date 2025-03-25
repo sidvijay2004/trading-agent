@@ -1,4 +1,5 @@
 from utils.sentiment import SentimentAnalyzer
+from datetime import datetime, timedelta
 
 class BaseAPI:
     TRACKED_STOCKS = ["TSLA", "NVDA", "META", "AMZN", "AAPL", "GME", "AMC", "PLTR", "MSFT", "GOOGL", "ARKK", "SPY"]
@@ -27,3 +28,17 @@ class BaseAPI:
             if stock in text:
                 return stock  # ✅ Return the first matched stock
         return None  # ❌ No tracked stock found
+    
+    def get_market_window_start(self):
+        """
+        Returns the datetime to use as the start of the sentiment fetch window.
+        - Monday → past 3 days (Fri + weekend)
+        - Tues–Fri → past 24 hours
+        """
+        now = datetime.utcnow()
+        weekday = now.weekday()
+
+        if weekday == 0:
+            return now - timedelta(days=3)
+        else:
+            return now - timedelta(days=1)
