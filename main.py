@@ -24,6 +24,14 @@ if __name__ == "__main__":
     execute_trades()
 
 def lambda_handler(event=None, context=None):
+    print(f"🟢 Lambda invoked with event: {event}")
+
+    print("🚀 Running sentiment analysis...")
     run_sentiment_analysis()
+
+    print("📈 Running trading model based on sentiment data...")
+    execute_trades()
+
+    print("✅ Lambda execution complete.")
     return {"status": "success"}
 
